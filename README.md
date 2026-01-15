@@ -70,3 +70,12 @@ At the end of the test, the Serial Monitor will print a block like this:
 ## Credits
 Built for the **Bass Hole** project.
 Designed to be used with AI coding assistants to speed up your hardware bring-up.
+
+## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Attribution
+If you use this project in your work, please credit:
+**Keith Wilkinson**
+[https://github.com/boxwrench/DIST_ESP32-CYD-Tester](https://github.com/boxwrench/DIST_ESP32-CYD-Tester)
+
