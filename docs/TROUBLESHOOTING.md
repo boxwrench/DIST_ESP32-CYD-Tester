@@ -109,58 +109,130 @@ If still white, try slower SPI:
 
 ## Section 3: Colors Wrong
 
+### Understanding the THREE Separate Color Settings
+
+**CRITICAL:** These are THREE INDEPENDENT settings that people often conflate:
+
+| Setting | What it controls | Symptoms when wrong |
+|---------|------------------|---------------------|
+| **RGB Order** | Red vs Blue channel position | Red/blue swapped (skin looks cyan) |
+| **Byte Swap** | Endianness of pixel data in buffers | UI fine, sprites garbled/wrong colors |
+| **Inversion** | Panel-level color inversion | Everything looks like a photo negative |
+
+You can have RGB order correct but byte swap wrong. You can have inversion correct but RGB order wrong. **Test each independently.**
+
+---
+
 ### Step 3.1: Identify the problem
 
-| What you see | Likely cause |
-|--------------|--------------|
-| Red and blue swapped | RGB order wrong |
-| Everything inverted (negative) | Panel inversion setting |
-| Sprites OK, text wrong | Sprite vs primitive conflict |
-| Washed out / pale | Brightness or color depth |
+| What you see | Likely cause | Fix |
+|--------------|--------------|-----|
+| Red and blue swapped | RGB order wrong | Step 3.2 |
+| Everything inverted (negative) | Panel inversion | Step 3.3 |
+| **UI fine, sprites/images wrong** | **Byte swap mismatch** | **Step 3.4** |
+| Washed out / pale | Double conversion or COLMOD | Step 3.5 |
 
-### Step 3.2: Red/Blue swapped
+---
 
-Add to build_flags:
-```ini
--DTFT_RGB_ORDER=TFT_BGR
-```
+### Step 3.2: Red/Blue swapped (RGB Order)
 
-Or in code:
+**Test:** Draw solid color bars with `fillRect()`:
 ```cpp
-tft.setSwapBytes(true);
+tft.fillRect(0, 0, 80, 50, 0xF800);   // Should be RED
+tft.fillRect(80, 0, 80, 50, 0x07E0);  // Should be GREEN
+tft.fillRect(160, 0, 80, 50, 0x001F); // Should be BLUE
 ```
+
+If red shows as blue (and vice versa), fix RGB order:
+
+**In platformio.ini:**
+```ini
+-DTFT_RGB_ORDER=TFT_BGR   ; or TFT_RGB - try both
+```
+
+**Note:** `setSwapBytes()` does NOT fix RGB order - that's a different issue!
+
+---
 
 ### Step 3.3: Colors inverted (negative image)
 
-**For dual-USB boards:**
-```cpp
-#define TFT_INVERSION_ON
+If colors look like a photo negative (white↔black, colors inverted):
+
+**Build flag approach (preferred):**
+```ini
+-DTFT_INVERSION_ON
 ```
 
-**For code-level control:**
+**Runtime approach (for testing only):**
 ```cpp
 tft.invertDisplay(true);   // or false - try both
 ```
 
-### Step 3.4: Sprites OK but UI wrong (or vice versa)
+**Important:** If using `invertDisplay()` makes colors look "washed out", that's a sign the underlying driver/init is wrong for your panel. Prefer fixing via build flags.
 
-This is the sprite vs primitive conflict. Two approaches:
+---
 
-**Approach A: Use invertDisplay(true) + normal colors**
+### Step 3.4: UI fine but sprites/images wrong (BYTE SWAP - Most Common!)
+
+This is THE classic CYD sprite problem:
+- `fillRect()`, `drawString()`, `drawPixel()` look correct
+- `pushImage()`, `pushSprite()`, sprite buffers look wrong (garbled, inverted-ish, wrong palette)
+
+**Root cause:** Your sprite pixel buffer is RGB565 but bytes are in opposite order from what the driver expects.
+
+**The fix - set swap bytes ONCE in init:**
 ```cpp
-tft.invertDisplay(true);
-#define COLOR_BLACK 0x0000  // Normal RGB565
-#define COLOR_WHITE 0xFFFF
+void gfxInit() {
+    tft.init();
+    tft.setSwapBytes(true);  // Apply to ALL pushImage/pushSprite calls
+    // ... rest of init
+}
 ```
 
-**Approach B: Use invertDisplay(false) + inverted colors**
+**Critical understanding:**
+- `setSwapBytes()` ONLY affects `pushImage()` / `pushSprite()` / buffer operations
+- `setSwapBytes()` does NOT affect `drawPixel()` / `fillRect()` / primitives
+- If you're doing pixel-by-pixel sprite rendering with `drawPixel()`, you need MANUAL byte swap:
+  ```cpp
+  uint16_t pixel = pgm_read_word(&sprite[offset]);
+  tft.drawPixel(x, y, (pixel >> 8) | (pixel << 8));  // Manual swap
+  ```
+
+**Best practice:** Use `pushImage()` with `setSwapBytes(true)` instead of pixel-by-pixel loops. It's faster AND handles byte order automatically.
+
+---
+
+### Step 3.5: Washed out / pale colors
+
+Usually caused by:
+1. Double byte-swapping (sprite data already swapped + setSwapBytes(true))
+2. Wrong color depth (COLMOD) in driver init
+3. PNG decoder doing unexpected gamma/color conversion
+
+**Debug approach:**
+1. Use RAW RGB565 sprite data (not PNG) to eliminate decoder variables
+2. Verify sprite data byte order matches your setSwapBytes setting
+3. Check you're not swapping bytes twice (once in data, once in code)
+
+---
+
+### Step 3.6: Sprites OK but UI wrong (or vice versa)
+
+If primitives and sprites show OPPOSITE behavior, you likely have:
+- Correct byte swap for one path but not the other
+- Or inversion affecting them differently
+
+**Solution:** Ensure consistent settings across ALL rendering:
 ```cpp
-tft.invertDisplay(false);
-#define COLOR_BLACK 0xFFFF  // XOR with 0xFFFF
-#define COLOR_WHITE 0x0000
+void gfxInit() {
+    tft.init();
+    tft.setRotation(3);
+    tft.setSwapBytes(true);      // For all pushImage operations
+    // invertDisplay handled by TFT_INVERSION_ON build flag
+}
 ```
 
-Run the Color Test in this tool to determine which works for your board.
+Run the Color Test in this tool to determine which combination works for your board.
 
 ---
 
@@ -387,6 +459,7 @@ This tool includes a color test. Here's how to interpret it:
 | White screen | Check USB count -> correct driver |
 | Red/blue swap | Add `-DTFT_RGB_ORDER=TFT_BGR` |
 | Inverted colors | Add `-DTFT_INVERSION_ON` |
+| **UI fine, sprites wrong** | **`tft.setSwapBytes(true);` in init** |
 | Touch dead | Use pins 25/32/39/33/36 not display pins |
 | Touch flipped | Swap min/max in map() function |
 | Upload fail | Hold BOOT button |
