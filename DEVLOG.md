@@ -42,6 +42,53 @@ When encountering hardware issues:
 
 ## Session Log
 
+### 2026-01-16 - Sprite Display Research & Test Planning
+
+**What was done:**
+- Deep dive research into CYD sprite display issues
+- Identified THREE SEPARATE settings that affect sprite colors (commonly conflated):
+  1. **RGB Order** (TFT_RGB vs TFT_BGR) - red/blue channel swap
+  2. **Byte Swap** (setSwapBytes) - endianness for pushImage/sprite buffers
+  3. **Inversion** (TFT_INVERSION_ON) - panel-level color inversion
+- Analyzed Bass-Hole graphics.cpp - found inconsistent byte swapping
+- Created test plan for validating sprite pipeline end-to-end
+
+**Key findings from research:**
+```
+Symptom                          | Likely Cause
+---------------------------------|----------------------------------
+Red/Blue swapped                 | RGB order wrong (TFT_RGB vs BGR)
+Negative/inverted look           | Panel inversion setting
+UI fine, sprites wrong           | Byte swap mismatch (MOST COMMON)
+Washed out colors                | Double conversion or wrong COLMOD
+```
+
+**Critical insight:**
+- `setSwapBytes(true)` only affects `pushImage()` / `pushSprite()`
+- `drawPixel()` is NOT affected by setSwapBytes
+- Bass-Hole does manual byte swap in `gfxDrawSpriteTransparent()` but NOT in `gfxDrawSprite()` or `gfxRestoreBackground()` - this is the bug!
+
+**Recommended fix approach:**
+1. Set `tft.setSwapBytes(true)` ONCE in gfxInit()
+2. Remove manual byte swap from gfxDrawSpriteTransparent()
+3. Use `pushImage()` with transparency parameter instead of pixel-by-pixel
+4. Ensure sprite data is generated with correct byte order
+
+**Files created:**
+- docs/SPRITE_TEST_PLAN.md - Hardware test checklist for sprite validation
+- docs/RESEARCH_AGENDA.md - 13 research topics with discrete prompts for future development
+- docs/research/ - Folder for research output documents
+
+**Next steps (requires hardware):**
+- Run RGB test bars to verify RGB/BGR order
+- Run sprite pushImage test with setSwapBytes(true)
+- Validate background restoration uses same byte order
+- Update Bass-Hole once ground truth established
+
+**Blocking issues:** No hardware available for testing
+
+---
+
 ### 2026-01-15 - v2.0 Major Enhancement
 
 **What was done:**
@@ -156,6 +203,9 @@ Test Sequence:
 - [ ] Touch mapping in color test uses hardcoded range (200-3800), should use calibration
 - [ ] No test for speaker/DAC output
 - [ ] Could add SPI frequency sweep test to find max stable speed
+- [ ] **Add sprite byte-swap test to main test suite** (see docs/SPRITE_TEST_PLAN.md)
+- [ ] Add pushImage vs fillRect color comparison test
+- [ ] Generate config output should include setSwapBytes recommendation
 
 ## Related Resources
 
