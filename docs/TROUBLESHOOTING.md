@@ -210,9 +210,11 @@ Usually caused by:
 3. PNG decoder doing unexpected gamma/color conversion
 
 **Debug approach:**
-1. Use RAW RGB565 sprite data (not PNG) to eliminate decoder variables
+1. Use RAW RGB565 sprite data (pre-converted from PNG using `img2raw.py`) to eliminate decoder variables
 2. Verify sprite data byte order matches your setSwapBytes setting
 3. Check you're not swapping bytes twice (once in data, once in code)
+
+**Note:** This project uses pre-conversion workflow - PNGs are converted to RGB565 offline, not decoded at runtime.
 
 ---
 
