@@ -1,0 +1,112 @@
+﻿Processing esp32dev (platform: espressif32; board: esp32dev; framework: arduino)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32dev.html
+PLATFORM: Espressif 32 (6.12.0) > Espressif ESP32 Dev Module
+HARDWARE: ESP32 240MHz, 320KB RAM, 4MB Flash
+DEBUG: Current (cmsis-dap) External (cmsis-dap, esp-bridge, esp-prog, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)
+PACKAGES: 
+ - framework-arduinoespressif32 @ 3.20017.241212+sha.dcc1105b 
+ - tool-esptoolpy @ 2.40900.250804 (4.9.0) 
+ - toolchain-xtensa-esp32 @ 8.4.0+2021r2-patch5
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ soft
+Found 35 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- TFT_eSPI @ 2.5.43
+|-- PNGdec @ 1.1.6
+|-- SD @ 2.0.0
+|-- SPI @ 2.0.0
+Building in release mode
+Compiling .pio\build\esp32dev\src\main.cpp.o
+platformio : 
+src/main.cpp: In 
+function 'bool 
+loadPNGFromSD(const 
+char*, uint16_t*, 
+int, int)':
+At line:1 char:1
++ platformio run 
+--environment 
+esp32dev 2>&1 | 
+Out-File -FilePath 
+"buil ...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (src/main.c   
+ pp: I...t*, int,     
+int)'::String) []    
+, RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+src/main.cpp:209:66: 
+error: invalid 
+conversion from 'void 
+(*)(PNGDRAW*)' {aka 
+'void 
+(*)(png_draw_tag*)'} 
+to 'int 
+(*)(PNGDRAW*)' {aka 
+'int 
+(*)(png_draw_tag*)'} 
+[-fpermissive]
+     int rc = 
+png.open(filepath, 
+myOpen, myClose, 
+myRead, mySeek, 
+pngDraw);
+                      
+                      
+                      
+^~~~~~~
+In file included from 
+src/main.cpp:16:
+.pio/libdeps/esp32dev/
+PNGdec/src/PNGdec.h:17
+5:171: note:   
+initializing argument 
+6 of 'int 
+PNG::open(const 
+char*, void* 
+(*)(const char*, 
+int32_t*), void 
+(*)(void*), int32_t 
+(*)(PNGFILE*, 
+uint8_t*, int32_t), 
+int32_t (*)(PNGFILE*, 
+int32_t), int 
+(*)(PNGDRAW*))'
+     int open(const 
+char *szFilename, 
+PNG_OPEN_CALLBACK 
+*pfnOpen, 
+PNG_CLOSE_CALLBACK 
+*pfnClose, 
+PNG_READ_CALLBACK 
+*pfnRead, 
+PNG_SEEK_CALLBACK 
+*pfnSeek, 
+PNG_DRAW_CALLBACK 
+*pfnDraw);
+                      
+                      
+                      
+                      
+                      
+                      
+                    ~~
+~~~~~~~~~~~~~~~~~^~~~~
+~~
+Archiving .pio\build\esp32dev\lib841\libSD.a
+*** [.pio\build\esp32d
+ev\src\main.cpp.o] 
+Error 1
+======================
+==== [FAILED] Took 
+3.16 seconds =========
+=================

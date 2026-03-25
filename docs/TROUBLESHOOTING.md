@@ -202,19 +202,27 @@ void gfxInit() {
 
 ---
 
-### Step 3.5: Washed out / pale colors
+### Step 3.5: Washed out / pale / BLUE colors
 
-Usually caused by:
-1. Double byte-swapping (sprite data already swapped + setSwapBytes(true))
-2. Wrong color depth (COLMOD) in driver init
-3. PNG decoder doing unexpected gamma/color conversion
+Usually caused by one of three things:
 
-**Debug approach:**
-1. Use RAW RGB565 sprite data (pre-converted from PNG using `img2raw.py`) to eliminate decoder variables
-2. Verify sprite data byte order matches your setSwapBytes setting
-3. Check you're not swapping bytes twice (once in data, once in code)
+#### 1. BGR vs RGB Bit Packing (THE "BLUE GHOST" PROBLEM)
+**CRITICAL DISCOVERY (2026-01-18):** Your hardware might be in BGR mode (`TFT_RGB_ORDER=1`). While `fillRect()` handles this for you, `pushImage()` sends raw bits. If you send RGB bits to a BGR display, **Red and Blue are swapped**.
 
-**Note:** This project uses pre-conversion workflow - PNGs are converted to RGB565 offline, not decoded at runtime.
+*   **Symptoms:** Red fish looks blue, skin looks cyan, colors look "icy" or washed out.
+*   **Fix:** You must packing bits as **BGR565** (BBBBB GGGGGG RRRRR) in your conversion script or PNG decoder. 
+*   **Test:** Use Test A5 (Pure Color Pattern) to verify. If the RED band looks BLUE, you need BGR packing.
+
+#### 2. Alpha Transparency Blending
+If your PNG has transparency, simply converting to RGB often blends pixels against **white**, making the sprite look "misty" or pale at the edges.
+
+*   **Fix:** Matte your PNG against a **BLACK background** before converting to RGB565. This preserves color saturation.
+*   **Python:** `Image.new('RGB', size, (0,0,0)).paste(img, mask=alpha)`
+
+#### 3. PNG decoding (32bpp vs 24bpp)
+If your PNG is RGBA (32-bit), the simple decoder loop `pPixels[x * 3]` will read the wrong bytes, causing horizontal line distortion and mismatched colors.
+
+*   **Fix:** Check `pDraw->iBpp`. If it's 32, you must read 4-byte steps and handle the alpha channel.
 
 ---
 
@@ -427,6 +435,79 @@ xTaskCreate(myTask, "Task", 8192, NULL, 1, NULL);  // 8KB stack
 - USB hub may not provide enough current
 - Try direct connection to computer
 - Use powered USB hub or USB charger (2A+)
+
+### Step 8.5: Function signature mismatches (LoadProhibited crashes)
+
+**Symptom:**
+```
+Guru Meditation Error: Core 1 panic'ed (LoadProhibited)
+EXCVADDR: 0x00000008
+```
+
+**Root cause:** Function called with wrong number/types of parameters, causing stack corruption and null pointer dereference.
+
+**Example from sprite test firmware:**
+```cpp
+// Function definition (CORRECT)
+void displayText(const char *text, int x, int y, uint16_t color, int size);
+
+// Wrong call (CRASH!)
+displayText("Test", 10, TFT_WHITE);  // Missing x,y parameters
+
+// Correct call
+displayText("Test", 10, 50, TFT_WHITE, 2);  // All parameters
+```
+
+**How to diagnose:**
+1. Crash backtrace points to function call site
+2. `EXCVADDR` is low address like `0x00000008` (dereferencing invalid pointer)
+3. Happens immediately when function is called
+4. Serial monitor shows execution reaching just before the call
+
+**Prevention:**
+- When changing function signatures, search ALL call sites: `grep -r "functionName(" .`
+- Use compiler warnings `-Wall -Wextra` to catch parameter mismatches
+- Test immediately after signature changes
+
+**This project note (2026-01-18):**
+Changed `displayText(text, y, color, size)` → `displayText(text, x, y, color, size)` and had 30+ call sites to fix. Caused boot loop crashes until all calls were corrected.
+
+**Best Practices for Function Signature Changes:**
+
+When refactoring a widely-used utility function:
+
+1. **Search first**: Find ALL call sites before making changes
+   ```powershell
+   Select-String "functionName\(" -Path .\src\*.cpp
+   ```
+
+2. **Two approaches**:
+   
+   **Option A - Atomic change** (small codebase):
+   - Change function signature + update all calls in ONE commit
+   - Test immediately after
+   
+   **Option B - Deprecation** (large codebase):
+   ```cpp
+   // Keep old function (deprecated)
+   void displayTextLeft(const char *text, int y, ...) { /* old impl */ }
+   
+   // Add new function with better name
+   void displayText(const char *text, int x, int y, ...) { /* new impl */ }
+   
+   // Gradually migrate call sites
+   ```
+
+3. **Why C++ won't save you**:
+   - Default parameters mean wrong calls still compile!
+   - Compiler sees: `displayText("Hi", 10, WHITE)` as valid for both signatures
+   - Runtime crash is the only indicator
+
+4. **Prevention checklist**:
+   - [ ] Count call sites before change
+   - [ ] Update all call sites
+   - [ ] Count call sites after change (should match)
+   - [ ] Test immediately
 
 ---
 

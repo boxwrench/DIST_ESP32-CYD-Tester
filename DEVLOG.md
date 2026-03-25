@@ -42,6 +42,46 @@ When encountering hardware issues:
 
 ## Session Log
 
+### 2026-01-19 - Sprite Color Resolution & Gamma Optimization
+
+**What was done:**
+- Created color diagnostic firmware to test gamma curves and sprite conversion tools
+- Identified and resolved washed-out sprite colors through hardware testing
+- Established verified "Ground Truth" configuration for ESP32-2432S028R
+
+**Key findings:**
+- **Gamma 0x01 is CRITICAL** for vibrant sprite colors on ILI9341_2_DRIVER
+  - Default gamma causes washed-out appearance in `pushImage()` sprites
+  - `fillRect()` colors unaffected, making diagnosis difficult
+  - Setting: `tft.writecommand(0x26); tft.writedata(0x01);` after `tft.init()`
+- **RGB vs BGR confusion resolved**:
+  - "CURRENT" tool (`png_to_rgb565.py --bgr`) was generating BGR565
+  - "EXTERNAL" tool generates RGB565 (correct for this hardware)
+  - Both use Little-Endian byte order
+- **Verified configuration**:
+  - Driver: `ILI9341_2_DRIVER` (fixes static/corruption)
+  - Gamma: `0x01` (fixes washed-out colors)
+  - Inversion: `invertDisplay(true)` (required with _2_DRIVER variant)
+  - Rotation: `1` (landscape, USB down)
+  - Sprites: RGB565 Little-Endian with `setSwapBytes(true)`
+
+**Tools created:**
+- `sprite_test_firmware_diagnostic/` - Gamma cycling test firmware
+- `test_assets/fish_bluegill_VERIFIED.rgb565` - Ground truth test asset
+- Updated `platformio.ini` with multiple test environments
+
+**Critical insight:**
+The washed-out sprite issue was NOT a byte-swap or RGB-order problem—it was the default gamma curve being incompatible with the specific panel variant. This explains why `fillRect()` looked fine but `pushImage()` looked desaturated.
+
+**Next steps:**
+- Update Bass-Hole project with verified gamma setting
+- Regenerate all sprite assets using RGB565 (not BGR565)
+- Document gamma requirement in all reference materials
+
+**Blocking issues:** None
+
+---
+
 ### 2026-01-16 - Sprite Display Research & Test Planning
 
 **What was done:**
@@ -200,7 +240,7 @@ Test Sequence:
 
 ## Known Issues / Tech Debt
 
-- [ ] Touch mapping in color test uses hardcoded range (200-3800), should use calibration
+- [ ] **Memory Constraint**: 115KB backgrounds fail allocation on internal RAM; investigate PSRAM or tiling.
 - [ ] No test for speaker/DAC output
 - [ ] Could add SPI frequency sweep test to find max stable speed
 - [ ] **Add sprite byte-swap test to main test suite** (see docs/SPRITE_TEST_PLAN.md)
