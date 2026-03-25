@@ -159,9 +159,43 @@ These patterns emerge from analysis of GitHub issues, forum posts, and community
 | **Black screen** | Backlight not initialized | `pinMode(21, OUTPUT); digitalWrite(21, HIGH);` |
 | **Inverted colors** | Panel inversion mismatch | Add `#define TFT_INVERSION_ON` (dual-USB variants) |
 | **Wrong colors (red/blue swapped)** | RGB byte order wrong | Add `#define TFT_RGB_ORDER TFT_BGR` |
+| **Washed out sprites (CRITICAL)** | Default gamma curve | **Set Gamma 0x01 after init** (see below) |
 | Flickering | No double buffering | Use TFT_eSprite or LVGL double buffer |
 | Partial/corrupted display | SPI too fast | Reduce `SPI_FREQUENCY` to 27000000 |
 | Only works after reset | Init timing | Add `delay(100);` before `tft.init();` |
+
+### Gamma correction (ILI9341_2_DRIVER)
+
+**CRITICAL DISCOVERY (2026-01-19):** The washed-out sprite issue is caused by the default gamma curve, NOT byte-swapping or RGB order.
+
+**Symptoms:**
+- `fillRect()` and UI elements look fine
+- `pushImage()` sprites appear desaturated/washed out
+- Colors are "correct" but lack vibrancy
+
+**Fix:**
+```cpp
+void setup() {
+    tft.init();
+    
+    // REQUIRED for vibrant sprite colors on ILI9341_2_DRIVER
+    tft.writecommand(0x26);  // Gamma Set command
+    tft.writedata(0x01);     // Gamma curve 1 (more saturated)
+    
+    // Continue with rest of init...
+}
+```
+
+**Gamma curve options:**
+- `0x01` - Most saturated (RECOMMENDED for sprites)
+- `0x02` - Slightly less saturated
+- `0x04` - Noticeably washed out
+- `0x08` - Very washed out (default on some panels)
+
+**Why this matters:**
+- Different panel batches may have different default gamma curves
+- The issue only affects `pushImage()` / sprite rendering
+- This explains why some users report "perfect colors" while others see washed-out sprites
 
 ### Touch failures
 
